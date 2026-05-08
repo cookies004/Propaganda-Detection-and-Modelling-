@@ -260,7 +260,12 @@ with st.sidebar:
 
     nodes_count = st.slider("Network size", 30, 120, 60)
     speed = st.slider("Speed (steps/sec)", 1, 10, 5)
-    max_steps = st.slider("Max steps", 10, 200, 50)
+    st.session_state.max_steps = st.slider(
+        "Max_steps",
+        10,
+        200,
+        st.session_state.max_steps
+    )
 
     propagation = st.selectbox(
         "Propagation type",
@@ -293,7 +298,7 @@ with st.sidebar:
 
     st.session_state.propagation = propagation
     st.session_state.mitigation = mitigation
-    st.session_state.max_steps = max_steps
+    
 
     st.markdown("---")
     st.markdown("**Legend**")
@@ -329,7 +334,20 @@ with st.expander("📝 Content Analysis", expanded=True):
             prob = float(model.predict_proba(vec)[0][1])
             st.session_state.label = "Propaganda" if pred == 1 else "Non-Propaganda"
             st.session_state.prob = prob
-            st.session_state.beta = prob
+            if pred == 1:
+                st.session_state.beta = prob
+                st.session_state.max_steps = 50
+            else:
+                st.session_state.beta = 0
+                st.session_state.max_steps = 0
+                st.session_state.sim_running = False
+                st.session_state.G = None
+                st.session_state.status_prop = None
+                st.session_state.status_mit = None
+                st.session_state.history_prop = []
+                st.session_state.history_mit = []
+                st.session_state.step = 0    
+
             st.session_state.use_manual_beta = False
             st.rerun()
         except Exception as e:
@@ -361,43 +379,46 @@ with b3:
     reset_btn = st.button("↺ Reset", use_container_width=True)
 
 if start_btn:
-    G = build_graph(nodes_count)
-    pos = nx.spring_layout(G, seed=42, k=1.8)
-    blocked = compute_blocked(G, mitigation)
-
-    # Propagation: everyone susceptible except start node
-    status_prop = {n: 0 for n in G.nodes()}
-    status_prop[start_node] = 1
-
-    # Mitigation: blocked nodes start as immune (2) — cannot ever be infected
-    status_mit = {n: 0 for n in G.nodes()}
-    status_mit[start_node] = 1
-    for b in blocked:
-        if b != start_node:
-            status_mit[b] = 2
-
-    st.session_state.G = G
-    st.session_state.positions = pos
-    st.session_state.blocked = blocked
-    st.session_state.status_prop = status_prop
-    st.session_state.status_mit = status_mit
-    st.session_state.history_prop = [1]
-    st.session_state.history_mit = [1]
-    st.session_state.step = 0
-    st.session_state.sim_running = True
-    st.session_state.beta = st.session_state.prob
-
-    if len(blocked) == 0:
-        st.warning("⚠️ No nodes blocked — both panels identical. Pick a mitigation strategy.")
+    if st.session_state.label != "Propaganda":
+        st.warning("Non-propaganda content detected. Simulation is only available for propaganda content.")
     else:
-        st.success(f"✅ {len(blocked)} nodes immunized by '{mitigation}'.")
+        G = build_graph(nodes_count)
+        pos = nx.spring_layout(G, seed=42, k=1.8)
+        blocked = compute_blocked(G, mitigation)
+
+        # Propagation: everyone susceptible except start node
+        status_prop = {n: 0 for n in G.nodes()}
+        status_prop[start_node] = 1
+
+        # Mitigation: blocked nodes start as immune (2) — cannot ever be infected
+        status_mit = {n: 0 for n in G.nodes()}
+        status_mit[start_node] = 1
+        for b in blocked:
+            if b != start_node:
+                status_mit[b] = 2
+
+        st.session_state.G = G
+        st.session_state.positions = pos
+        st.session_state.blocked = blocked
+        st.session_state.status_prop = status_prop
+        st.session_state.status_mit = status_mit
+        st.session_state.history_prop = [1]
+        st.session_state.history_mit = [1]
+        st.session_state.step = 0
+        st.session_state.sim_running = True
+
+
+        if len(blocked) == 0:
+            st.warning("⚠️ No nodes blocked — both panels identical. Pick a mitigation strategy.")
+        else:
+            st.success(f"✅ {len(blocked)} nodes immunized by '{mitigation}'.")
 
 if stop_btn:
     st.session_state.sim_running = False
 
 if reset_btn:
-    for k, v in defaults.items():
-        st.session_state[k] = v
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
     st.rerun()
 
 # =========================
@@ -489,7 +510,10 @@ if st.session_state.sim_running:
     elif st.session_state.mitigation == "Hybrid":
         st.info("Both hubs and bridges are blocked → strongest control applied.")
 
-else:
+elif st.session_state.label == "Non-Propaganda":
+    st.success("Safe content detected. No propaganda propagation simulation required.")
+
+elif st.session_state.step > 0:
     st.success("Simulation finished. Final spread displayed.")
 
 
