@@ -318,10 +318,9 @@ with st.expander("📝 Content Analysis", expanded=True):
         analyze = st.button("Analyze", type="primary", use_container_width=True)
     with col_prob:
         if st.session_state.label:
-            prob_pct = int(st.session_state.prob * 100)
             badge_cls = "badge-prop" if st.session_state.label == "Propaganda" else "badge-safe"
             st.markdown(
-                f'<div class="{badge_cls}">{st.session_state.label} — {prob_pct}% probability</div>',
+                f'<div class="{badge_cls}">{st.session_state.label}</div>',
                 unsafe_allow_html=True
             )
             st.progress(st.session_state.prob)
@@ -355,7 +354,7 @@ with st.expander("📝 Content Analysis", expanded=True):
     if st.session_state.label is not None:
         st.markdown("### How analysis works")
         st.info("Step 1: Your text is converted into numerical form using TF-IDF vectorization.")
-        st.info("Step 2: The trained Logistic Regression model analyzes patterns in the text.")
+        st.info("Step 2: The trained classification model analyzes patterns in the text.")
         st.info(f"Step 3: The model predicts **{st.session_state.label}** with probability **{round(st.session_state.prob, 2)}**.")        
 
     manual_beta = st.slider(
